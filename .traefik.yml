@@ -3,7 +3,7 @@ displayName: JWT Organization Redirect
 type: middleware
 iconPath: .assets/icon.png
 
-import: github.com/daxroc/jwt-org-redirect
+import: github.com/daxroc/traefik-jwt-org-redirect
 
 summary: 'Extracts organization from JWT tokens and redirects OAuth requests with organization parameter'
 

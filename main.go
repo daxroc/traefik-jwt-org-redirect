@@ -1,6 +1,6 @@
 // Package jwt_org_redirect implements a Traefik middleware that extracts organization
 // information from JWT tokens and redirects OAuth requests with the correct organization parameter.
-package main
+package traefik_jwt_org_redirect
 
 import (
 	"context"
@@ -20,31 +20,31 @@ import (
 type Config struct {
 	// RedirectEndpoint is the endpoint to redirect to when access_token is missing
 	RedirectEndpoint string `json:"redirectEndpoint,omitempty"`
-	
+
 	// ProtectedPaths are the paths that require JWT processing (e.g., ["/auth", "/login"])
 	ProtectedPaths []string `json:"protectedPaths,omitempty"`
-	
+
 	// OAuthEndpoint is the OAuth provider endpoint to redirect to with organization parameter
 	OAuthEndpoint string `json:"oauthEndpoint,omitempty"`
-	
+
 	// JWTSecretKey is the secret key for JWT validation (optional, for validation)
 	JWTSecretKey string `json:"jwtSecretKey,omitempty"`
-	
+
 	// OrganizationParam is the name of the organization parameter to add (default: "organization")
 	OrganizationParam string `json:"organizationParam,omitempty"`
-	
+
 	// TokenSources defines where to look for JWT tokens (cookie, header, query)
 	TokenSources []string `json:"tokenSources,omitempty"`
-	
+
 	// CookieName is the name of the cookie containing the JWT token
 	CookieName string `json:"cookieName,omitempty"`
-	
+
 	// HeaderName is the name of the header containing the JWT token
 	HeaderName string `json:"headerName,omitempty"`
-	
+
 	// QueryParam is the name of the query parameter containing the JWT token
 	QueryParam string `json:"queryParam,omitempty"`
-	
+
 	// Debug enables debug logging
 	Debug bool `json:"debug,omitempty"`
 }
@@ -81,27 +81,27 @@ func New(ctx context.Context, next http.Handler, config *Config, name string) (h
 	if config.RedirectEndpoint == "" {
 		config.RedirectEndpoint = "/login"
 	}
-	
+
 	if len(config.ProtectedPaths) == 0 {
 		config.ProtectedPaths = []string{"/auth"}
 	}
-	
+
 	if config.OrganizationParam == "" {
 		config.OrganizationParam = "organization"
 	}
-	
+
 	if len(config.TokenSources) == 0 {
 		config.TokenSources = []string{"cookie", "header", "query"}
 	}
-	
+
 	if config.CookieName == "" {
 		config.CookieName = "access_token"
 	}
-	
+
 	if config.HeaderName == "" {
 		config.HeaderName = "Authorization"
 	}
-	
+
 	if config.QueryParam == "" {
 		config.QueryParam = "access_token"
 	}
@@ -158,7 +158,7 @@ func (j *JWTOrgRedirect) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 
 	// Add organization parameter to request
 	j.addOrganizationParam(req, orgName)
-	
+
 	if j.config.Debug {
 		log.Printf("[%s] Added organization parameter: %s=%s", j.name, j.config.OrganizationParam, orgName)
 	}
@@ -186,7 +186,7 @@ func (j *JWTOrgRedirect) isProtectedPath(path string) bool {
 func (j *JWTOrgRedirect) extractToken(req *http.Request) string {
 	for _, source := range j.config.TokenSources {
 		var token string
-		
+
 		switch source {
 		case "cookie":
 			if cookie, err := req.Cookie(j.config.CookieName); err == nil {
@@ -205,7 +205,7 @@ func (j *JWTOrgRedirect) extractToken(req *http.Request) string {
 		case "query":
 			token = req.URL.Query().Get(j.config.QueryParam)
 		}
-		
+
 		if token != "" {
 			if j.config.Debug {
 				log.Printf("[%s] Found token in %s", j.name, source)
@@ -213,7 +213,7 @@ func (j *JWTOrgRedirect) extractToken(req *http.Request) string {
 			return token
 		}
 	}
-	
+
 	return ""
 }
 
@@ -239,20 +239,20 @@ func (j *JWTOrgRedirect) parseOrgFromJWT(tokenString string) (string, error) {
 			}
 			return []byte(j.config.JWTSecretKey), nil
 		})
-		
+
 		if err != nil {
 			return "", fmt.Errorf("JWT validation failed: %w", err)
 		}
-		
+
 		if !validatedToken.Valid {
 			return "", fmt.Errorf("invalid JWT token")
 		}
-		
+
 		validatedClaims, ok := validatedToken.Claims.(*JWTClaims)
 		if !ok {
 			return "", fmt.Errorf("invalid validated JWT claims")
 		}
-		
+
 		claims = validatedClaims
 	}
 
@@ -265,7 +265,7 @@ func (j *JWTOrgRedirect) addOrganizationParam(req *http.Request, orgName string)
 	query := req.URL.Query()
 	query.Set(j.config.OrganizationParam, orgName)
 	req.URL.RawQuery = query.Encode()
-	
+
 	// Also add as form value for POST requests
 	if req.Method == "POST" && req.Header.Get("Content-Type") == "application/x-www-form-urlencoded" {
 		if err := req.ParseForm(); err == nil {
@@ -279,13 +279,13 @@ func (j *JWTOrgRedirect) redirectToLogin(rw http.ResponseWriter, req *http.Reque
 	// Preserve the original URL as a return parameter
 	returnURL := req.URL.String()
 	redirectURL := j.config.RedirectEndpoint
-	
+
 	if strings.Contains(redirectURL, "?") {
 		redirectURL += "&return_url=" + url.QueryEscape(returnURL)
 	} else {
 		redirectURL += "?return_url=" + url.QueryEscape(returnURL)
 	}
-	
+
 	http.Redirect(rw, req, redirectURL, http.StatusTemporaryRedirect)
 }
 
@@ -306,7 +306,7 @@ func (j *JWTOrgRedirect) redirectToOAuth(rw http.ResponseWriter, req *http.Reque
 		j.next.ServeHTTP(rw, req)
 		return
 	}
-	
+
 	// Copy existing query parameters
 	query := oauthURL.Query()
 	for key, values := range req.URL.Query() {
@@ -314,32 +314,32 @@ func (j *JWTOrgRedirect) redirectToOAuth(rw http.ResponseWriter, req *http.Reque
 			query.Add(key, value)
 		}
 	}
-	
+
 	// Add organization parameter
 	query.Set(j.config.OrganizationParam, orgName)
 	oauthURL.RawQuery = query.Encode()
-	
+
 	if j.config.Debug {
 		log.Printf("[%s] Redirecting to OAuth with organization: %s", j.name, oauthURL.String())
 	}
-	
+
 	http.Redirect(rw, req, oauthURL.String(), http.StatusTemporaryRedirect)
 }
 
 // Health check endpoint for monitoring
 func (j *JWTOrgRedirect) healthCheck(rw http.ResponseWriter, req *http.Request) {
 	response := map[string]interface{}{
-		"status":    "healthy",
-		"timestamp": time.Now().UTC().Format(time.RFC3339),
+		"status":     "healthy",
+		"timestamp":  time.Now().UTC().Format(time.RFC3339),
 		"middleware": j.name,
 		"config": map[string]interface{}{
-			"protected_paths":     j.config.ProtectedPaths,
-			"redirect_endpoint":   j.config.RedirectEndpoint,
-			"organization_param":  j.config.OrganizationParam,
-			"token_sources":       j.config.TokenSources,
+			"protected_paths":    j.config.ProtectedPaths,
+			"redirect_endpoint":  j.config.RedirectEndpoint,
+			"organization_param": j.config.OrganizationParam,
+			"token_sources":      j.config.TokenSources,
 		},
 	}
-	
+
 	rw.Header().Set("Content-Type", "application/json")
 	rw.WriteHeader(http.StatusOK)
 	json.NewEncoder(rw).Encode(response)

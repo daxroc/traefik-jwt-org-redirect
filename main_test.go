@@ -1,4 +1,4 @@
-package main
+package traefik_jwt_org_redirect
 
 import (
 	"context"

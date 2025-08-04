@@ -1,0 +1,39 @@
+# Traefik Dynamic Configuration for Local Development
+# This file configures the JWT Organization Redirect middleware for local testing
+
+http:
+  middlewares:
+    jwt-org-redirect:
+      plugin:
+        jwt-org-redirect:
+          redirectEndpoint: "/login"
+          protectedPaths:
+            - "/auth"
+            - "/oauth"
+            - "/login"
+          oauthEndpoint: "http://localhost:3001/oauth/authorize"
+          organizationParam: "organization"
+          tokenSources:
+            - "cookie"
+            - "header"
+          cookieName: "test_session"
+          headerName: "Authorization"
+          debug: true  # Enable debug logging for development
+
+    # Optional: Add CORS middleware for development
+    cors-dev:
+      headers:
+        accessControlAllowMethods:
+          - GET
+          - POST
+          - PUT
+          - DELETE
+          - OPTIONS
+        accessControlAllowOriginList:
+          - "http://localhost:3000"
+          - "http://localhost:3001"
+        accessControlAllowHeaders:
+          - "Content-Type"
+          - "Authorization"
+          - "X-Requested-With"
+        accessControlAllowCredentials: true

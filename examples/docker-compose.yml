@@ -1,4 +1,4 @@
-# Docker Compose example for testing JWT Organization Redirect Middleware
+# Docker Compose example for testing JWT Organization Redirect Middleware (Local Development)
 version: '3.8'
 
 services:
@@ -9,9 +9,10 @@ services:
       - "--api.insecure=true"
       - "--providers.docker=true"
       - "--providers.docker.exposedbydefault=false"
+      - "--providers.file.filename=/etc/traefik/dynamic.yml"
+      - "--providers.file.watch=true"
       - "--entrypoints.web.address=:80"
-      - "--experimental.plugins.jwt-org-redirect.modulename=github.com/daxroc/traefik-jwt-org-redirect"
-      - "--experimental.plugins.jwt-org-redirect.version=v1.0.0"
+      - "--experimental.localPlugins.jwt-org-redirect.modulename=github.com/daxroc/traefik-jwt-org-redirect"
       - "--log.level=DEBUG"
     ports:
       - "80:80"
@@ -19,35 +20,38 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - ./traefik-dynamic.yml:/etc/traefik/dynamic.yml:ro
+      - ../:/plugins-local/src/github.com/daxroc/traefik-jwt-org-redirect:ro  # Mount local source
+    environment:
+      - TRAEFIK_PLUGINS_DIR=/plugins-local
     networks:
       - jwt-test-network
 
-  test-app:
-    image: nginx:alpine
-    container_name: test-app
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.test-app.rule=Host(`localhost`)"
-      - "traefik.http.routers.test-app.middlewares=jwt-org-redirect@file"
-      - "traefik.http.services.test-app.loadbalancer.server.port=80"
-    volumes:
-      - ./test-app/index.html:/usr/share/nginx/html/index.html:ro
-      - ./test-app/auth.html:/usr/share/nginx/html/auth.html:ro
-      - ./test-app/login.html:/usr/share/nginx/html/login.html:ro
-    networks:
-      - jwt-test-network
+  # test-app:
+  #   image: nginx:alpine
+  #   container_name: test-app
+  #   labels:
+  #     - "traefik.enable=true"
+  #     - "traefik.http.routers.test-app.rule=Host(`localhost`)"
+  #     - "traefik.http.routers.test-app.middlewares=jwt-org-redirect@file"
+  #     - "traefik.http.services.test-app.loadbalancer.server.port=80"
+  #   volumes:
+  #     - ./test-app/index.html:/usr/share/nginx/html/index.html:ro
+  #     - ./test-app/auth.html:/usr/share/nginx/html/auth.html:ro
+  #     - ./test-app/login.html:/usr/share/nginx/html/login.html:ro
+  #   networks:
+  #     - jwt-test-network
 
-  oauth-mock:
-    image: node:18-alpine
-    container_name: oauth-mock
-    working_dir: /app
-    command: node server.js
-    volumes:
-      - ./oauth-mock:/app
-    ports:
-      - "3001:3000"
-    networks:
-      - jwt-test-network
+  # oauth-mock:
+  #   image: node:18-alpine
+  #   container_name: oauth-mock
+  #   working_dir: /app
+  #   command: node server.js
+  #   volumes:
+  #     - ./oauth-mock:/app
+  #   ports:
+  #     - "3001:3000"
+  #   networks:
+  #     - jwt-test-network
 
 networks:
   jwt-test-network:
