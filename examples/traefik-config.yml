@@ -1,0 +1,243 @@
+# Traefik Configuration Examples for JWT Organization Redirect Middleware
+
+# Example 1: Basic Grafana OAuth Integration
+http:
+  routers:
+    grafana-oauth:
+      rule: "Host(`grafana.example.com`) && PathPrefix(`/login`)"
+      middlewares:
+        - "jwt-org-redirect"
+      service: "grafana"
+      tls:
+        certResolver: "letsencrypt"
+
+  middlewares:
+    jwt-org-redirect:
+      plugin:
+        jwt-org-redirect:
+          redirectEndpoint: "/login"
+          protectedPaths:
+            - "/login/generic_oauth"
+            - "/oauth"
+            - "/auth"
+          oauthEndpoint: "https://oauth.example.com/authorize"
+          organizationParam: "organization"
+          tokenSources:
+            - "cookie"
+            - "header"
+          cookieName: "grafana_session"
+          headerName: "Authorization"
+          debug: false
+
+  services:
+    grafana:
+      loadBalancer:
+        servers:
+          - url: "http://grafana.insightflow.svc.cluster.local:3000"
+
+---
+
+# Example 2: Multi-Application OAuth with JWT Validation
+http:
+  routers:
+    multi-app-oauth:
+      rule: "Host(`apps.example.com`)"
+      middlewares:
+        - "jwt-org-redirect-secure"
+      service: "multi-app"
+
+  middlewares:
+    jwt-org-redirect-secure:
+      plugin:
+        jwt-org-redirect:
+          redirectEndpoint: "/sso/login"
+          protectedPaths:
+            - "/auth"
+            - "/oauth"
+            - "/login"
+            - "/grafana"
+            - "/kibana"
+          oauthEndpoint: "https://sso.example.com/oauth2/authorize"
+          organizationParam: "org"
+          tokenSources:
+            - "cookie"
+            - "header"
+            - "query"
+          cookieName: "sso_token"
+          headerName: "X-Auth-Token"
+          queryParam: "token"
+          jwtSecretKey: "${JWT_SECRET_KEY}"  # From environment variable
+          debug: true
+
+  services:
+    multi-app:
+      loadBalancer:
+        servers:
+          - url: "http://multi-app.default.svc.cluster.local:8080"
+
+---
+
+# Example 3: Development Environment with Debug Logging
+http:
+  routers:
+    dev-oauth:
+      rule: "Host(`dev.example.com`)"
+      middlewares:
+        - "jwt-org-redirect-dev"
+      service: "dev-app"
+
+  middlewares:
+    jwt-org-redirect-dev:
+      plugin:
+        jwt-org-redirect:
+          redirectEndpoint: "/dev/login"
+          protectedPaths:
+            - "/auth"
+            - "/oauth"
+            - "/admin"
+          organizationParam: "organization"
+          tokenSources:
+            - "cookie"
+            - "header"
+          cookieName: "dev_session"
+          headerName: "Authorization"
+          debug: true  # Enable debug logging for development
+
+  services:
+    dev-app:
+      loadBalancer:
+        servers:
+          - url: "http://localhost:3000"
+
+---
+
+# Example 4: API Gateway with Multiple Token Sources
+http:
+  routers:
+    api-gateway:
+      rule: "Host(`api.example.com`) && PathPrefix(`/v1/auth`)"
+      middlewares:
+        - "jwt-org-redirect-api"
+      service: "api-gateway"
+
+  middlewares:
+    jwt-org-redirect-api:
+      plugin:
+        jwt-org-redirect:
+          redirectEndpoint: "/api/v1/login"
+          protectedPaths:
+            - "/v1/auth"
+            - "/v1/oauth"
+            - "/v1/user"
+          organizationParam: "org_id"
+          tokenSources:
+            - "header"
+            - "query"
+            - "cookie"
+          cookieName: "api_token"
+          headerName: "X-API-Token"
+          queryParam: "access_token"
+          jwtSecretKey: "${API_JWT_SECRET}"
+
+  services:
+    api-gateway:
+      loadBalancer:
+        servers:
+          - url: "http://api-gateway.api.svc.cluster.local:8080"
+
+---
+
+# Example 5: Kubernetes Ingress with Traefik CRD
+apiVersion: traefik.containo.us/v1alpha1
+kind: IngressRoute
+metadata:
+  name: grafana-oauth-ingress
+  namespace: monitoring
+spec:
+  entryPoints:
+    - websecure
+  routes:
+    - match: Host(`grafana.example.com`)
+      kind: Rule
+      middlewares:
+        - name: jwt-org-redirect
+      services:
+        - name: grafana
+          port: 3000
+  tls:
+    certResolver: letsencrypt
+
+---
+apiVersion: traefik.containo.us/v1alpha1
+kind: Middleware
+metadata:
+  name: jwt-org-redirect
+  namespace: monitoring
+spec:
+  plugin:
+    jwt-org-redirect:
+      redirectEndpoint: "/login"
+      protectedPaths:
+        - "/login/generic_oauth"
+        - "/oauth"
+      oauthEndpoint: "https://oauth.example.com/authorize"
+      organizationParam: "organization"
+      tokenSources:
+        - "cookie"
+      cookieName: "grafana_session"
+
+---
+
+# Example 6: Production Configuration with Health Checks
+http:
+  routers:
+    production-oauth:
+      rule: "Host(`prod.example.com`)"
+      middlewares:
+        - "rate-limit"
+        - "jwt-org-redirect-prod"
+        - "security-headers"
+      service: "production-app"
+
+  middlewares:
+    rate-limit:
+      rateLimit:
+        burst: 100
+        average: 50
+
+    jwt-org-redirect-prod:
+      plugin:
+        jwt-org-redirect:
+          redirectEndpoint: "/sso/login"
+          protectedPaths:
+            - "/auth"
+            - "/oauth"
+            - "/admin"
+            - "/api/private"
+          oauthEndpoint: "https://sso.example.com/oauth2/authorize"
+          organizationParam: "organization"
+          tokenSources:
+            - "cookie"
+            - "header"
+          cookieName: "session_token"
+          headerName: "Authorization"
+          jwtSecretKey: "${PROD_JWT_SECRET}"
+          debug: false  # Disable debug in production
+
+    security-headers:
+      headers:
+        customRequestHeaders:
+          X-Forwarded-Proto: "https"
+        customResponseHeaders:
+          X-Frame-Options: "DENY"
+          X-Content-Type-Options: "nosniff"
+
+  services:
+    production-app:
+      loadBalancer:
+        servers:
+          - url: "http://prod-app.production.svc.cluster.local:8080"
+        healthCheck:
+          path: "/health"
+          interval: "30s"
+          timeout: "5s"

@@ -1,0 +1,19 @@
+# Traefik plugin configuration
+displayName: JWT Organization Redirect
+type: middleware
+iconPath: .assets/icon.png
+
+import: github.com/daxroc/jwt-org-redirect
+
+summary: 'Extracts organization from JWT tokens and redirects OAuth requests with organization parameter'
+
+testData:
+  redirectEndpoint: "/login"
+  cookieName: access_token
+  protectedPaths:
+    - "/login"
+  tokenSources:
+    - cookie
+  oauthEndpoint: https://oauth.example.com/authorize
+  organizationParam: organization
+  debug: false
